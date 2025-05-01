@@ -1,1 +1,17 @@
 # financial_wizard
+
+
+# Retrieval-Augmented Summary
+
+- **Pinecone** for vector storage & similarity search  
+- **Cohere** for text embeddings  
+- **Hugging Face** (Flan-T5) as a free local LLM  --- need to update this to use fin-R1
+- **LangChain** to wire everything together  
+
+touch .env and replace your keys
+
+MISTRAL_API_KEY=""
+COHERE_API_KEY=""
+PINECONE_API_KEY = ""
+PINECONE_ENVIRONMENT='us-east-1'
+INDEX_NAME = "financial-wizard"

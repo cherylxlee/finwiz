@@ -1,0 +1,41 @@
+name: financial_wizard
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  run-qa-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10.16'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install \
+            python-dotenv \
+            pinecone-client \
+            cohere \
+            langchain \
+            langchain-pinecone \
+            langchain-cohere \
+            transformers \
+            accelerate
+
+      - name: Run QA Pipeline
+        env:
+          PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
+          PINECONE_ENVIRONMENT: ${{ secrets.PINECONE_ENVIRONMENT }}
+          INDEX_NAME: ${{ secrets.INDEX_NAME }}
+          COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+        run: |
+          python qa_pipeline.py
