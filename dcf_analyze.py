@@ -34,7 +34,6 @@ def load_dcf_metrics_csv(uploaded_file=None, sample_data=None):
 
 def clean_and_prepare_data(df):
     """Clean and prepare the data for DCF analysis."""
-    # Create a copy to avoid modifying the original
     cleaned_df = df.copy()
     
     # Convert columns to numeric, handling any non-numeric values
@@ -42,20 +41,17 @@ def clean_and_prepare_data(df):
         if col != 'Metric':
             cleaned_df[col] = pd.to_numeric(cleaned_df[col], errors='coerce')
     
-    # Set Metric as the index for easier access
+    # Set Metric as the index
     cleaned_df.set_index('Metric', inplace=True)
     
     return cleaned_df
 
 def calculate_historical_metrics(df):
     """Calculate additional historical metrics needed for forecasting."""
-    # Get years in descending order (most recent first)
+    # Get most recent yr first
     years = sorted([col for col in df.columns if col != 'Metric'], reverse=True)
-    
-    # Create a dictionary to store the results
     historical_metrics = {}
     
-    # Extract base metrics
     for metric in df.index:
         historical_metrics[metric] = {year: df.loc[metric, year] for year in years}
     
@@ -99,7 +95,7 @@ def calculate_wacc(risk_free_rate, market_risk_premium, beta, cost_of_debt, tax_
     # Cost of Equity using CAPM
     cost_of_equity = risk_free_rate + beta * market_risk_premium
     
-    # WACC calculation (tax_rate is already in decimal form)
+    # WACC calculation (tax_rate is already in decimal form!)
     wacc = (equity_weight * cost_of_equity) + (debt_weight * cost_of_debt * (1 - tax_rate))
     
     return wacc
@@ -112,11 +108,11 @@ def forecast_financials(historical_metrics, forecast_years, growth_rates, latest
     for metric, values in historical_metrics.items():
         forecasted_metrics[metric] = values.copy()
     
-    # Convert growth rates to multipliers (e.g., 5% → 1.05)
+    # Convert growth rates to multipliers (5% --> 1.05)
     revenue_growth_multipliers = {year: 1 + growth_rates['revenue'][i]/100 
                                 for i, year in enumerate(forecast_years)}
     
-    # Get the most recent values for each metric
+    # Get most recent values for each metric
     latest_revenue = historical_metrics['Revenue'][latest_year]
     latest_ebit_margin = historical_metrics['EBIT_Margin'][latest_year]
     latest_tax_rate = historical_metrics['Tax_Rate'][latest_year]
@@ -125,7 +121,6 @@ def forecast_financials(historical_metrics, forecast_years, growth_rates, latest
     
     # Apply growth assumptions over the forecast period
     for i, year in enumerate(forecast_years):
-        # Initialize if needed
         if 'Revenue' not in forecasted_metrics:
             forecasted_metrics['Revenue'] = {}
         if 'Operating_Income' not in forecasted_metrics:
@@ -182,11 +177,11 @@ def calculate_free_cash_flows(forecasted_metrics, forecast_years):
     free_cash_flows = {}
     
     for year in forecast_years:
-        # Free Cash Flow = EBIT * (1 - Tax Rate) + Depreciation - CapEx - Δ Net Working Capital
-        # Since we're assuming NWC = 0, the Δ Net Working Capital term is eliminated
+        # Free Cash Flow = EBIT * (1 - Tax Rate) + Depreciation - CapEx - Change in Net Working Capital
+        # Since we're assuming NWC = 0, the Net Working Capital term is eliminated
         
         ebit = forecasted_metrics['Operating_Income'][year]
-        tax_rate = forecasted_metrics['Tax_Rate'][year]  # Already in decimal form from extract tool
+        tax_rate = forecasted_metrics['Tax_Rate'][year]
         depreciation = forecasted_metrics['Depreciation'][year]
         capex = forecasted_metrics['CapEx'][year]
         
@@ -456,9 +451,8 @@ def create_valuation_waterfall_chart(dcf_results):
 
 def dcf_calculator_ui():
     """Main UI function for the DCF Calculator tab."""
-    st.title("DCF Calculator")
+    st.subheader("DCF Calculator")
     
-    # Introduction
     st.markdown("""
     This tool performs a simple Discounted Cash Flow (DCF) analysis based on the extracted financial metrics.
     The calculator uses a transparent, step-by-step approach to forecast future cash flows and calculate
@@ -491,10 +485,21 @@ def dcf_calculator_ui():
         valuation purposes. For more detailed analysis, working capital could be incorporated as a separate 
         forecast component.
                     
-        ### 2) Capital Structure: 90% equity, 10% debt for tech companies
+        ### 2) Capital Structure: 80% equity, 20% debt for tech companies
+        1. **Historically Low Leverage**: Most tech companies have historically maintained low debt levels relative 
+           to equity. For example, Apple and Microsoft have taken on some debt primarily for tax arbitrage or buybacks—not
+           out of necessity. Companies like Alphabet and Meta have virtually no long-term debt, reflecting minimal reliance on leverage.
+
+        2. **Strong Cash Flow Generation**: These firms generate massive free cash flows that reduce their need for external financing.
+
+        3. **High Credit Ratings**: Their strong credit ratings (often AA or better) mean they could take on more debt, but they choose not to.
+
+        4. **Growth Orientation Over Financial Engineering**: These companies prioritize innovation, R&D, and strategic investments over aggressive
+           financial structuring. They often reinvest cash into growth rather than taking on debt to fund dividends or repurchases.
+
+        5. **Market Confidence in Equity**: Investors place a premium on their stock due to growth potential, network effects, and brand power.
         """)
     
-    # File upload or use sample data
     st.subheader("Step 1: Load Financial Data")
     
     data_source = st.radio("Select data source:", ["Upload CSV", "Use Sample Data"])
@@ -528,21 +533,18 @@ Tax_Rate,0.132,0.147,0.164"""
         
         with col1:
             risk_free_rate = st.number_input("Risk-Free Rate (%)", value=3.5, min_value=0.0, max_value=10.0, step=0.1)
-            market_risk_premium = st.number_input("Market Risk Premium (%)", value=5.5, min_value=1.0, max_value=15.0, step=0.1)
+            market_risk_premium = st.number_input("Market Risk Premium (%)", value=4.5, min_value=1.0, max_value=15.0, step=0.1)
             beta = st.number_input("Company Beta", value=1.2, min_value=0.1, max_value=3.0, step=0.1)
         
         with col2:
-            cost_of_debt = st.number_input("Cost of Debt (%)", value=4.0, min_value=0.0, max_value=15.0, step=0.1)
+            cost_of_debt = st.number_input("Cost of Debt (%)", value=3.5, min_value=0.0, max_value=15.0, step=0.1)
             # Get tax rate and convert to percentage for display
             original_tax_rate = float(dcf_data.loc[dcf_data['Metric'] == 'Tax_Rate', '2024'].values[0])
-            # If the tax rate is in decimal form (e.g., 0.132 for 13.2%), convert to percentage for display
             display_tax_rate = original_tax_rate * 100 if original_tax_rate < 1 else original_tax_rate
             tax_rate = st.number_input("Effective Tax Rate (%)", value=display_tax_rate, min_value=0.0, max_value=50.0, step=0.1)
-            # Convert back to decimal for calculations
-            tax_rate_decimal = tax_rate / 100
             
-            # Capital structure (default to 90% equity, 10% debt for tech companies)
-            equity_weight = st.slider("Equity Weight (%)", value=90, min_value=0, max_value=100, step=1)
+            # Capital structure
+            equity_weight = st.slider("Equity Weight (%)", value=80, min_value=0, max_value=100, step=1)
             debt_weight = 100 - equity_weight
             st.write(f"Debt Weight: {debt_weight}%")
             
@@ -552,7 +554,7 @@ Tax_Rate,0.132,0.147,0.164"""
             'market_risk_premium': market_risk_premium,
             'beta': beta,
             'cost_of_debt': cost_of_debt,
-            'tax_rate': tax_rate_decimal,  # Use decimal form for calculations
+            'tax_rate': tax_rate / 100,
             'equity_weight': equity_weight / 100,
             'debt_weight': debt_weight / 100
         }
@@ -563,14 +565,14 @@ Tax_Rate,0.132,0.147,0.164"""
             market_risk_premium, 
             beta, 
             cost_of_debt, 
-            tax_rate,
+            tax_rate / 100,
             equity_weight / 100, 
             debt_weight / 100
         )
         
         st.info(f"Calculated WACC: {wacc:.2f}%")
         
-        # Input parameters for forecasting
+
         st.subheader("Step 3: Set Growth Assumptions")
         
         col1, col2 = st.columns(2)
@@ -603,14 +605,13 @@ Tax_Rate,0.132,0.147,0.164"""
             st.write("Revenue Growth Rates (%)")
             growth_rates = []
             
-            # Get the most recent year from the data
             latest_year = int(years[0])
             
             # Create 5 forecast years
             forecast_years = [str(latest_year + i + 1) for i in range(5)]
             
             # Create a default declining growth rate (starting with historical average)
-            default_growth_rate = max(1.0, avg_revenue_growth)
+            default_growth_rate = max(7.0, avg_revenue_growth)
             default_rates = [
                 default_growth_rate,
                 default_growth_rate * 0.9,
@@ -666,7 +667,7 @@ Tax_Rate,0.132,0.147,0.164"""
             # Terminal growth rate
             terminal_growth_rate = st.number_input(
                 "Terminal Growth Rate (%)", 
-                value=2.0, 
+                value=4.0, 
                 min_value=0.0, 
                 max_value=5.0, 
                 step=0.1
@@ -1013,7 +1014,7 @@ Tax_Rate,0.132,0.147,0.164"""
                             title='EBIT Margin (%)',
                             side='right',
                             overlaying='y',
-                            range=[0, 50]  # Adjust based on your data
+                            range=[0, 50]
                         ),
                         legend=dict(
                             orientation="h",
@@ -1144,14 +1145,7 @@ Tax_Rate,0.132,0.147,0.164"""
                     
                     3. **Linear Growth Projections**: The model uses simple growth rates rather than detailed business forecasting.
                     
-                    4. **Constant EBIT Margins**: The model assumes relatively stable margins unless a target is specified.
-                    
-                    For a more detailed analysis, you might want to consider:
-                    
-                    - Adding Net Working Capital
-                    - Including debt adjustments
-                    - Modeling individual business segments
-                    - Incorporating more detailed operating metrics
+                    4. **Constant EBIT Margins**: The model assumes relatively stable margins unless a target is specified.                    
                     """)
                 
                 # Export options
