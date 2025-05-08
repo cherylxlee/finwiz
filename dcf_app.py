@@ -302,10 +302,34 @@ def create_financial_qa_prompt(company):
         input_variables=["context", "question"]
     )
 
+def create_financial_qa_prompt_gpt4o(company, context, question):
+    """Create a GPT-4o prompt for financial data extraction."""
+    return f"""
+You are a financial analyst extracting information from 10-K documents for {company}.
+    
+CONTEXT INFORMATION:
+{context}
+    
+QUESTION:
+{question}
+    
+TASK:
+- Use ONLY the information in the context above to answer the question.
+- Be precise with numbers, including units (e.g., $M, $B, %, etc.).
+- If data from multiple years is available, clearly show the trend.
+- If the information includes tables or financial statements, parse them correctly.
+- If you see page numbers in the context, mention them in your response.
+- If the information is not available in the context, say "The information is not available in the provided context."
+    
+OUTPUT FORMAT:
+Start with a brief direct answer to the question.
+Then provide supporting details and context.
+Include source pages if available.
+"""
+
 def execute_financial_query(llm, vectorstore, prompt, user_query, k_value=5):
     """Execute a financial query using a retrieval QA chain."""
     try:
-        # Build the RetrievalQA chain
         qa = RetrievalQA.from_chain_type(
             llm=llm,
             chain_type="stuff",
@@ -316,10 +340,8 @@ def execute_financial_query(llm, vectorstore, prompt, user_query, k_value=5):
             return_source_documents=True
         )
         
-        # Execute the query with RAG
         result = qa.invoke({"query": user_query})
         
-        # Filter out <think> sections if present
         if '<think>' in result['result']:
             result['result'] = filter_thinking(result['result'])
         
@@ -331,29 +353,21 @@ def execute_financial_query(llm, vectorstore, prompt, user_query, k_value=5):
 def execute_financial_query_with_gpt4o(client, vectorstore, company, user_query, k_value=5):
     """Execute a financial query using GPT-4o with RAG."""
     try:
-        # Retrieve relevant documents
         docs = vectorstore.similarity_search(user_query, k=k_value)
-        
-        # Extract and format context
         context = "\n\n".join([doc.page_content for doc in docs])
+        prompt = create_financial_qa_prompt_gpt4o(company, context, user_query)
         
-        # Create the prompt
-        prompt = create_financial_qa_prompt(company, context, user_query)
-        
-        # Call GPT-4o
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
                 {"role": "system", "content": "You are a financial analyst expert in extracting and interpreting data from 10-K filings."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.1  # Lower temperature for more accurate extraction
+            temperature=0.1
         )
         
-        # Process the response
         answer = response.choices[0].message.content
         
-        # Create a result dictionary similar to what execute_financial_query returns
         result = {
             "result": answer,
             "source_documents": docs
