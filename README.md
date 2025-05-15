@@ -57,9 +57,9 @@ FinWiz leverages a comprehensive AI stack:
   - Qwen3-14B via Ollama locally
 - **Image Storage**: Google Cloud Storage
 
-![Stack](demo/stack.png)
-
 ## 🏗️ Architecture
+
+![Stack](demo/stack.png)
 
 ```
 Financial Documents → Content Extraction → Text & Image Embeddings → Vector Database → Generation Models → Streamlit Interface
